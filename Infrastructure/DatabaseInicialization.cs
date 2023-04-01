@@ -3,23 +3,49 @@ using MongoDB.Driver;
 
 namespace Infrastructure;
 
-public class ArtistRepository : IArtistRepository
+public class DatabaseInicialization
 {
     private readonly IMongoCollection<Artist> _artists;
+    private readonly IMongoDatabase _database;
 
-    public ArtistRepository(IMongoClient mongoClient)
+    public DatabaseInicialization(IMongoClient mongoClient)
     {
-        var database = mongoClient.GetDatabase("Waartist");
-        _artists = database.GetCollection<Artist>("Artists");
+        _database = mongoClient.GetDatabase("Waartist");
+        _artists = _database.GetCollection<Artist>("Artists");
     }
 
-    public async Task CreateAsync(Artist artist)
+    public async Task Up()
     {
-        await _artists.InsertOneAsync(artist);
+        var artist = await _artists.Find(a => true).Limit(1).FirstOrDefaultAsync();
+        if (artist is null)
+            InsertDemoArtists();
     }
 
-    public async Task<Artist> GetByEmailAsync(string email)
+    public async Task Down()
     {
-        return await _artists.Find(a => a.Email == email).FirstOrDefaultAsync();
+        await _artists.DeleteManyAsync(artist => true);
+    }
+
+    private async Task InsertDemoArtists()
+    {
+        await _artists.InsertManyAsync(new [] {
+            new Artist
+            {
+                Id = Guid.NewGuid().ToString(),
+                Email = "some-email@gmail.com",
+                PasswordHash = "some-hashed-password",
+                Name = "Fulgencio Garcia",
+                ShowDescription = "Making software live"
+            },
+            new Artist
+            {
+                Id = Guid.NewGuid().ToString(),
+                Email = "any-email@gmail.com",
+                PasswordHash = "this is a hashed-password",
+                Name = "Fangoria",
+                ShowDescription = "Espectáculos de la bruja avería"
+            }
+        }
+        );
     }
 }
